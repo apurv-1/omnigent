@@ -9,6 +9,7 @@
 // would each hold their own anchor and diverge.
 
 import { useCallback, useMemo, useState } from "react";
+import { releaseConversationScrollLock } from "@/components/ai-elements/conversation";
 import { useChatStore } from "@/store/chatStore";
 
 export interface UserMessageNav {
@@ -79,6 +80,12 @@ export function scrollToMessage(
   // Supersede the previous jump's pending flash so rapid nav only flashes
   // the message we finally land on.
   cancelPendingFlash?.();
+
+  // Opening a tall transcript starts StickToBottom locked to the bottom.
+  // Without releasing that lock, the next content-resize scrollToBottom
+  // yanks the view back — deep-link / rail jumps look like a no-op on
+  // multi-message sessions (single short transcripts stay in view anyway).
+  releaseConversationScrollLock();
 
   el.scrollIntoView({ block: "center", behavior: "smooth" });
 
