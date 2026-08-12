@@ -53,27 +53,26 @@ function getScrollParent(node: Element): Element | null {
  *     scrolled, the centering scroll is deferred a frame so the freshly mounted
  *     node exists to center on.
  */
-export function scrollToUserMessage(
-  itemId: string,
+export function scrollToMessage(
+  messageId: string,
   flash?: (id: string) => void,
   ensureVisible?: (id: string) => boolean,
 ): void {
   // The row may be windowed out of the DOM (virtualized transcript). Ask the
   // transcript to scroll it into the mounted range first; its node then mounts
   // on the next frame, so retry the DOM lookup + centering scroll there.
-  const scrolledIntoWindow = ensureVisible?.(itemId) ?? false;
-  const el = document.querySelector(
-    // CSS.escape is defensive — itemIds are alphanumeric today.
-    `[data-user-message-id="${CSS.escape(itemId)}"]`,
-  );
+  const scrolledIntoWindow = ensureVisible?.(messageId) ?? false;
+  const el =
+    document.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`) ??
+    document.querySelector(`[data-user-message-id="${CSS.escape(messageId)}"]`);
   if (!el) {
     if (scrolledIntoWindow) {
       // Row is being mounted by the virtualizer — center on it next frame.
-      requestAnimationFrame(() => scrollToUserMessage(itemId, flash));
+      requestAnimationFrame(() => scrollToMessage(messageId, flash));
       return;
     }
     // Fail loud: id exists in the list but DOM anchor is missing.
-    console.warn(`scrollToUserMessage: no element for itemId=${itemId}`);
+    console.warn(`scrollToMessage: no element for messageId=${messageId}`);
     return;
   }
 
@@ -105,7 +104,7 @@ export function scrollToUserMessage(
     if (done) return;
     done = true;
     cleanup();
-    flash?.(itemId);
+    flash?.(messageId);
   }
 
   function onScroll(): void {
@@ -119,6 +118,14 @@ export function scrollToUserMessage(
   // each scroll event reschedules it while the smooth-scroll is in motion.
   settleTimer = window.setTimeout(finish, SCROLL_SETTLE_MS);
   maxTimer = window.setTimeout(finish, SCROLL_SETTLE_MAX_MS);
+}
+
+export function scrollToUserMessage(
+  itemId: string,
+  flash?: (id: string) => void,
+  ensureVisible?: (id: string) => boolean,
+): void {
+  scrollToMessage(itemId, flash, ensureVisible);
 }
 
 export function useUserMessageNav(

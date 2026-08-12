@@ -25,6 +25,7 @@ import { useChatStore } from "@/store/chatStore";
 import { TranscriptScrollbar } from "@/pages/TranscriptScrollbar";
 import { TurnRail, type Turn } from "@/pages/TurnRail";
 import { StreamBudgetBanner } from "@/components/StreamBudgetBanner";
+import { useMessageDeepLink } from "@/hooks/useMessageDeepLink";
 import { useUserMessageNav } from "@/hooks/useUserMessageNav";
 import { ChatPlanAccordion } from "@/shell/ChatPlanAccordion";
 import { RunnerStartingIndicator, McpStartupIndicator } from "@/pages/ChatIndicators";
@@ -250,6 +251,7 @@ function TranscriptImpl({
     [display.bubbles],
   );
   const nav = useUserMessageNav(userMessageIds, ensureItemVisible);
+  useMessageDeepLink(conversationId ?? null);
 
   // One rail tick per real user turn, paired with a preview of the reply that
   // followed. Mirrors the transcript's loaded window and grows lazily.
