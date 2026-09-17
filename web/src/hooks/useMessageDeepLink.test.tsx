@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { useState, type ReactNode } from "react";
 import { TerminalFirstContextProvider } from "@/shell/TerminalFirstContext";
 import { useChatStore } from "@/store/chatStore";
-import { useMessageDeepLink } from "./useMessageDeepLink";
+import { useMessageDeepLink, useMessageDeepLinkChatView } from "./useMessageDeepLink";
 
 const releaseScrollLock = vi.hoisted(() => vi.fn());
 vi.mock("@/components/ai-elements/conversation", async (importOriginal) => {
@@ -166,12 +166,44 @@ describe("useMessageDeepLink", () => {
     expect(releaseScrollLock).not.toHaveBeenCalled();
   });
 
+  it("waits for the virtualizer and mounts a loaded target before paging history", () => {
+    const loadMoreHistory = vi.fn();
+    const ensureMessageVisible = vi.fn(() => true);
+    useChatStore.setState({ hasMoreHistory: true, loadMoreHistory });
+    const { rerender } = renderHook(
+      ({ ready, rangeNonce }) =>
+        useMessageDeepLink("conv_1", { ready, rangeNonce, ensureMessageVisible }),
+      {
+        initialProps: { ready: false, rangeNonce: 0 },
+        wrapper: wrapperFor("/c/conv_1?message=response_1"),
+      },
+    );
+    expect(ensureMessageVisible).not.toHaveBeenCalled();
+    expect(loadMoreHistory).not.toHaveBeenCalled();
+    rerender({ ready: true, rangeNonce: 0 });
+    expect(ensureMessageVisible).toHaveBeenCalledWith("response_1");
+    expect(loadMoreHistory).not.toHaveBeenCalled();
+    expect(scrollSpy).not.toHaveBeenCalled();
+
+    document.body.innerHTML = '<div data-message-id="response_1">older reply</div>';
+    rerender({ ready: true, rangeNonce: 1 });
+    expect(scrollSpy).toHaveBeenCalledOnce();
+    act(() => vi.advanceTimersByTime(SETTLE_MS));
+    expect(useChatStore.getState().flashItemId).toBe("response_1");
+  });
+
   it("opens Chat before resolving the message, then permits returning to Terminal", () => {
     const loadMoreHistory = vi.fn();
     useChatStore.setState({ hasMoreHistory: true, loadMoreHistory });
-    renderHook(() => useMessageDeepLink("conv_1"), {
-      wrapper: terminalWrapperFor("/c/conv_1?message=msg_1"),
-    });
+    renderHook(
+      () => {
+        useMessageDeepLinkChatView("conv_1");
+        useMessageDeepLink("conv_1");
+      },
+      {
+        wrapper: terminalWrapperFor("/c/conv_1?message=msg_1"),
+      },
+    );
 
     expect(screen.getByText("hello")).toBeInTheDocument();
     expect(loadMoreHistory).not.toHaveBeenCalled();
@@ -185,9 +217,15 @@ describe("useMessageDeepLink", () => {
   });
 
   it("preserves Terminal view without a message link", () => {
-    renderHook(() => useMessageDeepLink("conv_1"), {
-      wrapper: terminalWrapperFor("/c/conv_1"),
-    });
+    renderHook(
+      () => {
+        useMessageDeepLinkChatView("conv_1");
+        useMessageDeepLink("conv_1");
+      },
+      {
+        wrapper: terminalWrapperFor("/c/conv_1"),
+      },
+    );
     expect(screen.getByText("Terminal view")).toBeInTheDocument();
     expect(scrollSpy).not.toHaveBeenCalled();
   });

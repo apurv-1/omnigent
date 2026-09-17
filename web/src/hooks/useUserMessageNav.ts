@@ -42,17 +42,8 @@ function getScrollParent(node: Element): Element | null {
 }
 
 /**
- * Smooth-scroll a user message into view (centered) and flash it once the
- * scroll settles. Shared by the Cmd+Alt nav hook and the turn rail so both
- * land on the message the same way. Anchors on the `data-user-message-id`
- * DOM attribute stamped by UserBubble.
- *
- * @param itemId - The user bubble's itemId (the DOM anchor to scroll to).
- * @param flash - Optional highlight callback fired when the scroll settles.
- * @param ensureVisible - Optional hook (from the virtualized transcript) that
- *     pulls a windowed-out row into the DOM. Called first; when it reports it
- *     scrolled, the centering scroll is deferred a frame so the freshly mounted
- *     node exists to center on.
+ * Center a user or assistant message and flash it after scrolling settles.
+ * `ensureVisible` mounts a virtualized row before the DOM lookup is retried.
  */
 export function scrollToMessage(
   messageId: string,

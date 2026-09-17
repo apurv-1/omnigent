@@ -21,10 +21,13 @@ from __future__ import annotations
 import re
 import uuid
 
+import httpx
 import pytest
 from playwright.sync_api import Browser, Page, Route, expect
 
-_COMPOSER_PLACEHOLDER = "Ask the agent anything…"
+from tests.e2e_ui.chat.test_transcript_scroll_persistence import _seed_turns
+
+_COMPOSER_PLACEHOLDER = "Send a message…"
 _USER_BUBBLE = '[data-testid="message-bubble"][data-role="user"]'
 
 
@@ -118,7 +121,7 @@ def test_copy_message_link_opens_and_highlights_target(
         expect(target).to_be_in_viewport(timeout=5_000)
         if terminal_view:
             expect(page.get_by_test_id("main-terminal-view")).not_to_be_visible()
-            assert page.evaluate("key => sessionStorage.getItem(key)", storage_key) is None
+            assert page.evaluate("key => sessionStorage.getItem(key)", storage_key) == "__chat__"
     finally:
         fresh.close()
 
@@ -163,3 +166,36 @@ def test_pending_message_link_is_disabled_until_persisted(
         for request in held_requests:
             request.abort()
         ctx.close()
+
+
+@pytest.mark.parametrize("target_role", ["user", "assistant"])
+def test_message_link_reaches_virtualized_history(
+    page: Page,
+    seeded_session: tuple[str, str],
+    target_role: str,
+) -> None:
+    """Find both a paged-out user message and a loaded, windowed-out response."""
+    base_url, session_id = seeded_session
+    _seed_turns(session_id, "deep")
+    if target_role == "user":
+        response = httpx.get(
+            f"{base_url}/v1/sessions/{session_id}/items",
+            params={"limit": 20, "order": "asc"},
+        )
+        response.raise_for_status()
+        message_id = next(
+            item["id"]
+            for item in response.json()["data"]
+            if item["type"] == "message" and item.get("role") == "user"
+        )
+        expected_text = "deep prompt 0"
+    else:
+        message_id = "resp_deep_060"
+        expected_text = "deep reply 60"
+
+    page.set_viewport_size({"width": 1280, "height": 720})
+    page.goto(f"{base_url}/c/{session_id}?message={message_id}")
+    target = page.locator(f'[data-message-id="{message_id}"]')
+    expect(target.locator(".animate-user-msg-flash")).to_be_attached(timeout=20_000)
+    expect(target).to_contain_text(expected_text)
+    expect(target).to_be_in_viewport(timeout=5_000)

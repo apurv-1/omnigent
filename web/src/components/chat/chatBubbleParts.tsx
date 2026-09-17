@@ -689,7 +689,9 @@ function UserBubble({ bubble }: { bubble: Extract<Bubble, { kind: "user" }> }) {
   const flashing = useChatStore((s) => s.flashItemId === bubble.itemId);
   const { isCopied, handleCopy } = useCopyMessage(() => text);
   const ts = formatBubbleTimestamp(bubble.createdAtS);
-  const { isLinkCopied, handleCopyLink } = useCopyMessageLink(bubble.pending ? null : bubble.itemId);
+  const { isLinkCopied, handleCopyLink } = useCopyMessageLink(
+    bubble.pending ? null : bubble.itemId,
+  );
   // Runtime-injected `[System: ...]` notifications ride in on role=user. When
   // the content is a pure system marker, swap in a muted centered indicator.
   if (images.length === 0 && fileChips.length === 0 && mentionedChips.length === 0) {
@@ -834,39 +836,37 @@ function UserBubble({ bubble }: { bubble: Extract<Bubble, { kind: "user" }> }) {
           </MessageContent>
         </div>
         {/* 40%-visible on touch, hover/focus-reveal on desktop. */}
-        {(
-          <div className="flex items-center justify-end gap-3 py-1 opacity-40 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
-            {ts && (
-              <span
-                className="select-none text-[11px] leading-4 text-foreground/56"
-                data-testid="message-timestamp"
-              >
-                {ts}
-              </span>
-            )}
-            <MessageActions>
-              {text && (
-                <MessageAction
-                  tooltip="Copy"
-                  size="icon-xxs"
-                  onClick={handleCopy}
-                  componentId="chat.message.copy_user"
-                >
-                  {isCopied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
-                </MessageAction>
-              )}
+        <div className="flex items-center justify-end gap-3 py-1 opacity-40 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+          {ts && (
+            <span
+              className="select-none text-[11px] leading-4 text-foreground/56"
+              data-testid="message-timestamp"
+            >
+              {ts}
+            </span>
+          )}
+          <MessageActions>
+            {text && (
               <MessageAction
-                  tooltip={isLinkCopied ? "Copied!" : "Copy link"}
-                  size="icon-xxs"
-                  data-testid="copy-message-link"
-                  disabled={bubble.pending}
-                  onClick={handleCopyLink}
-                >
-                  {isLinkCopied ? <CheckIcon size={14} /> : <Link2Icon size={14} />}
-                </MessageAction>
-            </MessageActions>
-          </div>
-        )}
+                tooltip="Copy"
+                size="icon-xxs"
+                onClick={handleCopy}
+                componentId="chat.message.copy_user"
+              >
+                {isCopied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+              </MessageAction>
+            )}
+            <MessageAction
+              tooltip={isLinkCopied ? "Copied!" : "Copy link"}
+              size="icon-xxs"
+              data-testid="copy-message-link"
+              disabled={bubble.pending}
+              onClick={handleCopyLink}
+            >
+              {isLinkCopied ? <CheckIcon size={14} /> : <Link2Icon size={14} />}
+            </MessageAction>
+          </MessageActions>
+        </div>
       </div>
     </Message>
   );
@@ -907,9 +907,9 @@ function AssistantBubble({
     : rootHasPendingElicitation;
   // Getter computes the markdown lazily at click time.
   const { isCopied, handleCopy } = useCopyMessage(() => collectBubbleMarkdown(bubble.items));
-  // null outside AppShell's provider (isolated tests) → hide the action.
   const { isLinkCopied, handleCopyLink } = useCopyMessageLink(bubble.responseId);
   const flashing = useChatStore((s) => s.flashItemId === bubble.responseId);
+  // null outside AppShell's provider (isolated tests) → hide the action.
   const forkDialog = useForkDialog();
   const handleRetryError = useCallback(
     async (item: Extract<RenderItem, { kind: "error" }>) => {
@@ -991,7 +991,12 @@ function AssistantBubble({
       >
         {/* A fold-only bubble takes w-full at the ordinary max-w-3xl cap rather
             than shrink-wrapping to the summary row's ~110px. */}
-        <MessageContent className={cn(spansFullColumn || foldOnly ? "w-full" : undefined, flashing && "animate-user-msg-flash")}>
+        <MessageContent
+          className={cn(
+            spansFullColumn || foldOnly ? "w-full" : undefined,
+            flashing && "animate-user-msg-flash",
+          )}
+        >
           <BlockRenderer
             items={bubble.items}
             sessionStatus={sessionStatus}
@@ -1015,8 +1020,7 @@ function AssistantBubble({
             <span>Interrupted</span>
           </p>
         )}
-        {/* Skipped on a fold-only bubble, when there is neither a timestamp nor
-            actions, and on an error-only bubble. Order: actions, then timestamp. */}
+        {/* Skip fold-only and error-only bubbles. Order: actions, then timestamp. */}
         {!foldOnly && !errorOnly && (
           <div
             className={cn(
@@ -1036,27 +1040,27 @@ function AssistantBubble({
                 </MessageAction>
               )}
               <MessageAction
-                  tooltip={isLinkCopied ? "Copied!" : "Copy link"}
-                  size="icon-xxs"
-                  data-testid="copy-message-link"
-                  onClick={handleCopyLink}
-                >
-                  {isLinkCopied ? <CheckIcon size={14} /> : <Link2Icon size={14} />}
-                </MessageAction>
-                {/* Fork from this response: clone the session with history
+                tooltip={isLinkCopied ? "Copied!" : "Copy link"}
+                size="icon-xxs"
+                data-testid="copy-message-link"
+                onClick={handleCopyLink}
+              >
+                {isLinkCopied ? <CheckIcon size={14} /> : <Link2Icon size={14} />}
+              </MessageAction>
+              {/* Fork from this response: clone the session with history
                     truncated after this turn. Hidden while streaming and when
                     the session can't be forked. */}
-                {forkDialog?.canFork && bubble.lifecycle !== "streaming" && (
-                  <MessageAction
-                    tooltip="Fork from here"
-                    size="icon-xxs"
-                    data-testid="fork-from-response"
-                    onClick={() => forkDialog.openForkDialog({ upToResponseId: bubble.responseId })}
-                    componentId="chat.message.fork"
-                  >
-                    <GitForkIcon size={14} />
-                  </MessageAction>
-                )}
+              {forkDialog?.canFork && bubble.lifecycle !== "streaming" && (
+                <MessageAction
+                  tooltip="Fork from here"
+                  size="icon-xxs"
+                  data-testid="fork-from-response"
+                  onClick={() => forkDialog.openForkDialog({ upToResponseId: bubble.responseId })}
+                  componentId="chat.message.fork"
+                >
+                  <GitForkIcon size={14} />
+                </MessageAction>
+              )}
             </MessageActions>
             {ts && (
               <span
