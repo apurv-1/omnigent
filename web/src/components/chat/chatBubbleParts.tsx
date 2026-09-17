@@ -1039,14 +1039,6 @@ function AssistantBubble({
                   {isCopied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
                 </MessageAction>
               )}
-              <MessageAction
-                tooltip={isLinkCopied ? "Copied!" : "Copy link"}
-                size="icon-xxs"
-                data-testid="copy-message-link"
-                onClick={handleCopyLink}
-              >
-                {isLinkCopied ? <CheckIcon size={14} /> : <Link2Icon size={14} />}
-              </MessageAction>
               {/* Fork from this response: clone the session with history
                     truncated after this turn. Hidden while streaming and when
                     the session can't be forked. */}
@@ -1061,6 +1053,14 @@ function AssistantBubble({
                   <GitForkIcon size={14} />
                 </MessageAction>
               )}
+              <MessageAction
+                tooltip={isLinkCopied ? "Copied!" : "Copy link"}
+                size="icon-xxs"
+                data-testid="copy-message-link"
+                onClick={handleCopyLink}
+              >
+                {isLinkCopied ? <CheckIcon size={14} /> : <Link2Icon size={14} />}
+              </MessageAction>
             </MessageActions>
             {ts && (
               <span
