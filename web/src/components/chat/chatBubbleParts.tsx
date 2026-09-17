@@ -201,6 +201,7 @@ export function buildPendingBubbles(
       kind: "user",
       // No server item id yet; tempId keeps React keys stable until promotion.
       itemId: p.tempId,
+      pending: true,
       content: p.content,
       ...(author !== null ? { createdBy: author } : {}),
       // Stamped once at send time; absent for snapshot-replayed entries,
@@ -635,7 +636,7 @@ const USER_MESSAGE_REMARK_REHYPE_OPTIONS: MessageResponseProps["remarkRehypeOpti
  *
  * @param messageId - Stable id stamped on the bubble (user itemId / assistant responseId).
  */
-function useCopyMessageLink(messageId: string): {
+function useCopyMessageLink(messageId: string | null): {
   isLinkCopied: boolean;
   handleCopyLink: () => void;
 } {
@@ -646,7 +647,7 @@ function useCopyMessageLink(messageId: string): {
   useEffect(() => () => window.clearTimeout(timeoutRef.current), []);
 
   const handleCopyLink = useCallback(() => {
-    if (isLinkCopied) return;
+    if (!messageId || isLinkCopied) return;
     copyText(buildMessageDeepLink(messageId)).then(
       () => {
         setIsLinkCopied(true);
@@ -688,7 +689,7 @@ function UserBubble({ bubble }: { bubble: Extract<Bubble, { kind: "user" }> }) {
   const flashing = useChatStore((s) => s.flashItemId === bubble.itemId);
   const { isCopied, handleCopy } = useCopyMessage(() => text);
   const ts = formatBubbleTimestamp(bubble.createdAtS);
-  const { isLinkCopied, handleCopyLink } = useCopyMessageLink(bubble.itemId);
+  const { isLinkCopied, handleCopyLink } = useCopyMessageLink(bubble.pending ? null : bubble.itemId);
   // Runtime-injected `[System: ...]` notifications ride in on role=user. When
   // the content is a pure system marker, swap in a muted centered indicator.
   if (images.length === 0 && fileChips.length === 0 && mentionedChips.length === 0) {
@@ -858,6 +859,7 @@ function UserBubble({ bubble }: { bubble: Extract<Bubble, { kind: "user" }> }) {
                   tooltip={isLinkCopied ? "Copied!" : "Copy link"}
                   size="icon-xxs"
                   data-testid="copy-message-link"
+                  disabled={bubble.pending}
                   onClick={handleCopyLink}
                 >
                   {isLinkCopied ? <CheckIcon size={14} /> : <Link2Icon size={14} />}

@@ -1,8 +1,9 @@
 import type * as ConversationModule from "@/components/ai-elements/conversation";
-import { act, renderHook } from "@testing-library/react";
+import { act, fireEvent, renderHook, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { TerminalFirstContextProvider } from "@/shell/TerminalFirstContext";
 import { useChatStore } from "@/store/chatStore";
 import { useMessageDeepLink } from "./useMessageDeepLink";
 
@@ -33,6 +34,42 @@ function wrapperFor(path: string) {
           <Route path="/c/:conversationId" element={children} />
         </Routes>
       </MemoryRouter>
+    );
+  };
+}
+
+function terminalWrapperFor(path: string) {
+  const Router = wrapperFor(path);
+  return function Wrapper({ children }: { children: ReactNode }) {
+    const [view, setView] = useState<"chat" | "terminal">("terminal");
+    return (
+      <Router>
+        <TerminalFirstContextProvider
+          value={{
+            isClaudeNative: false,
+            isNativeWrapper: false,
+            isTerminalFirst: true,
+            isShellView: false,
+            view,
+            setView,
+            terminalViewKey: null,
+            terminalsAvailable: true,
+            terminalStartingUp: false,
+          }}
+        >
+          {children}
+          {view === "chat" ? (
+            <>
+              <div data-message-id="msg_1">hello</div>
+              <button type="button" onClick={() => setView("terminal")}>
+                Terminal
+              </button>
+            </>
+          ) : (
+            <div>Terminal view</div>
+          )}
+        </TerminalFirstContextProvider>
+      </Router>
     );
   };
 }
@@ -127,5 +164,31 @@ describe("useMessageDeepLink", () => {
     });
     expect(scrollSpy).not.toHaveBeenCalled();
     expect(releaseScrollLock).not.toHaveBeenCalled();
+  });
+
+  it("opens Chat before resolving the message, then permits returning to Terminal", () => {
+    const loadMoreHistory = vi.fn();
+    useChatStore.setState({ hasMoreHistory: true, loadMoreHistory });
+    renderHook(() => useMessageDeepLink("conv_1"), {
+      wrapper: terminalWrapperFor("/c/conv_1?message=msg_1"),
+    });
+
+    expect(screen.getByText("hello")).toBeInTheDocument();
+    expect(loadMoreHistory).not.toHaveBeenCalled();
+    expect(scrollSpy).toHaveBeenCalledOnce();
+    act(() => vi.advanceTimersByTime(SETTLE_MS));
+    expect(useChatStore.getState().flashItemId).toBe("msg_1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Terminal" }));
+    expect(screen.getByText("Terminal view")).toBeInTheDocument();
+    expect(scrollSpy).toHaveBeenCalledOnce();
+  });
+
+  it("preserves Terminal view without a message link", () => {
+    renderHook(() => useMessageDeepLink("conv_1"), {
+      wrapper: terminalWrapperFor("/c/conv_1"),
+    });
+    expect(screen.getByText("Terminal view")).toBeInTheDocument();
+    expect(scrollSpy).not.toHaveBeenCalled();
   });
 });

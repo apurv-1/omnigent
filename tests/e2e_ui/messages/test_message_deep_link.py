@@ -21,7 +21,8 @@ from __future__ import annotations
 import re
 import uuid
 
-from playwright.sync_api import Browser, Page, expect
+import pytest
+from playwright.sync_api import Browser, Page, Route, expect
 
 _COMPOSER_PLACEHOLDER = "Ask the agent anything…"
 _USER_BUBBLE = '[data-testid="message-bubble"][data-role="user"]'
@@ -35,9 +36,11 @@ def _send(page: Page, text: str) -> None:
     page.get_by_role("button", name="Send", exact=True).click()
 
 
+@pytest.mark.parametrize("terminal_view", [False, True])
 def test_copy_message_link_opens_and_highlights_target(
     browser: Browser,
     seeded_session: tuple[str, str],
+    terminal_view: bool,
 ) -> None:
     """Copy link → clipboard URL → fresh session lands on + flashes the message."""
     base_url, session_id = seeded_session
@@ -92,6 +95,19 @@ def test_copy_message_link_opens_and_highlights_target(
     fresh = browser.new_context()
     try:
         page = fresh.new_page()
+        if terminal_view:
+            response = page.request.patch(
+                f"{base_url}/v1/sessions/{session_id}",
+                data={"labels": {"omnigent.ui": "terminal"}},
+            )
+            assert response.ok, response.text()
+            storage_key = f"omnigent.web.panel-key:{session_id}"
+            page.goto(f"{base_url}/c/{session_id}")
+            page.get_by_test_id("view-mode-terminal").click(timeout=15_000)
+            expect(page.get_by_test_id("main-terminal-view")).to_be_visible(timeout=15_000)
+            expect(page.locator(_USER_BUBBLE)).to_have_count(0)
+            assert page.evaluate("key => sessionStorage.getItem(key)", storage_key) is not None
+
         # Wait for the flash class as soon as the page loads — it only lasts
         # ~800ms after the scroll settles, so racing it after other expects
         # can miss the highlight.
@@ -100,5 +116,50 @@ def test_copy_message_link_opens_and_highlights_target(
         expect(target.locator(".animate-user-msg-flash")).to_be_attached(timeout=20_000)
         expect(target).to_be_visible()
         expect(target).to_be_in_viewport(timeout=5_000)
+        if terminal_view:
+            expect(page.get_by_test_id("main-terminal-view")).not_to_be_visible()
+            assert page.evaluate("key => sessionStorage.getItem(key)", storage_key) is None
     finally:
         fresh.close()
+
+
+def test_pending_message_link_is_disabled_until_persisted(
+    browser: Browser,
+    seeded_session: tuple[str, str],
+) -> None:
+    """Text copy stays available while the send waits for a permanent item ID."""
+    base_url, session_id = seeded_session
+    marker = f"pending-link-{uuid.uuid4().hex[:8]}"
+    ctx = browser.new_context(permissions=["clipboard-read", "clipboard-write"])
+    held_requests: list[Route] = []
+    try:
+        page = ctx.new_page()
+        page.goto(f"{base_url}/c/{session_id}")
+        page.route(
+            f"**/v1/sessions/{session_id}/events", lambda route: held_requests.append(route)
+        )
+        _send(page, marker)
+        bubble = page.locator(_USER_BUBBLE).filter(has_text=marker)
+        expect(bubble.get_by_test_id("copy-message-link")).to_be_disabled()
+        expect(bubble).to_have_attribute("data-message-id", re.compile(r"^pend_"))
+        bubble.hover()
+        copy_text = bubble.get_by_role("button", name="Copy", exact=True)
+        copy_text.click()
+        expect(copy_text.locator("svg.lucide-check")).to_have_count(1)
+        assert page.evaluate("navigator.clipboard.readText()") == marker
+
+        assert len(held_requests) == 1
+        held_requests.pop().continue_()
+        expect(bubble.get_by_test_id("copy-message-link")).to_be_enabled(timeout=15_000)
+        message_id = bubble.get_attribute("data-message-id")
+        assert message_id and not message_id.startswith("pend_")
+        bubble.get_by_test_id("copy-message-link").click()
+        expect(
+            bubble.get_by_test_id("copy-message-link").locator("svg.lucide-check")
+        ).to_have_count(1)
+        clipboard = page.evaluate("navigator.clipboard.readText()")
+        assert re.search(rf"[?&]message={re.escape(message_id)}", clipboard)
+    finally:
+        for request in held_requests:
+            request.abort()
+        ctx.close()

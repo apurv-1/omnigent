@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MessageContentBlock } from "@/lib/blocks";
 import type { Bubble } from "@/lib/renderItems";
 import { FileViewerContext } from "@/shell/FileViewerContext";
-import { BubbleView } from "./ChatPage";
+import { BubbleView, buildPendingBubbles } from "./ChatPage";
 
 // UserBubble renders its text through the same markdown renderer as the
 // assistant bubble (FilePathAwareMessageResponse → Streamdown). These tests
@@ -360,6 +360,37 @@ describe("UserBubble copy-link button", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
+
+  it.each(["pend_12", "server_pending_input_12"])(
+    "disables links for pending input %s until promotion, while keeping text copy",
+    async (tempId) => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal("navigator", { clipboard: { writeText } });
+      vi.stubGlobal("location", { href: "https://app.example/c/conv_1" });
+      const [pending] = buildPendingBubbles(
+        [{ tempId, content: [{ type: "input_text", text: "queued message" }] }],
+        null,
+      );
+      const { rerender } = renderBubble(pending);
+      const link = screen.getByRole("button", { name: "Copy link" });
+      expect(link).toBeDisabled();
+      fireEvent.click(link);
+      expect(writeText).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith("queued message"));
+
+      rerender(
+        <FileViewerContext.Provider value={FILE_VIEWER_NOOP}>
+          <BubbleView bubble={userBubble("queued message", { itemId: "item_42" })} />
+        </FileViewerContext.Provider>,
+      );
+      expect(screen.getByRole("button", { name: "Copy link" })).toBeEnabled();
+      fireEvent.click(screen.getByRole("button", { name: "Copy link" }));
+      await waitFor(() =>
+        expect(writeText).toHaveBeenLastCalledWith("https://app.example/c/conv_1?message=item_42"),
+      );
+    },
+  );
 
   it("copies a ?message= deep link for the bubble itemId", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);

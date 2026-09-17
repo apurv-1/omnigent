@@ -7,6 +7,7 @@ import { useSearchParams } from "@/lib/routing";
 import { MESSAGE_QUERY_PARAM, findMessageElement } from "@/lib/messageDeepLink";
 import { scrollToMessage } from "@/hooks/useUserMessageNav";
 import { useChatStore } from "@/store/chatStore";
+import { useTerminalFirst } from "@/shell/TerminalFirstContext";
 
 /**
  * When the URL carries ``?message=<id>``, scroll that message into view
@@ -17,6 +18,9 @@ import { useChatStore } from "@/store/chatStore";
 export function useMessageDeepLink(conversationId: string | null): void {
   const [searchParams] = useSearchParams();
   const messageId = searchParams.get(MESSAGE_QUERY_PARAM);
+  const terminalFirst = useTerminalFirst();
+  const showTerminal = terminalFirst?.isTerminalFirst && terminalFirst.view === "terminal";
+  const setView = terminalFirst?.setView;
   const loadingConversation = useChatStore((s) => s.loadingConversation);
   const hasMoreHistory = useChatStore((s) => s.hasMoreHistory);
   const loadingMoreHistory = useChatStore((s) => s.loadingMoreHistory);
@@ -33,6 +37,12 @@ export function useMessageDeepLink(conversationId: string | null): void {
     const key = `${conversationId}:${messageId}`;
     if (appliedKeyRef.current === key) return;
     if (loadingConversation || loadingMoreHistory) return;
+
+    // The transcript mounts on the render after switching out of Terminal.
+    if (showTerminal) {
+      setView?.("chat");
+      return;
+    }
 
     const el = findMessageElement(messageId);
     if (el) {
@@ -56,5 +66,7 @@ export function useMessageDeepLink(conversationId: string | null): void {
     hasMoreHistory,
     historyGeneration,
     flashUserMessage,
+    showTerminal,
+    setView,
   ]);
 }
