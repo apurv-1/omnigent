@@ -207,12 +207,14 @@ describe("useUserMessageNav", () => {
     const { result } = renderHook(() => useUserMessageNav(["a"]));
 
     act(() => result.current.goPrev());
-    act(() => vi.advanceTimersByTime(SETTLE_MS));
+    act(() => vi.advanceTimersToNextTimer());
     expect(useChatStore.getState().flashItemId).toBe("a");
 
     act(() => {
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(1499);
     });
+    expect(useChatStore.getState().flashItemId).toBe("a");
+    act(() => vi.advanceTimersByTime(1));
     expect(useChatStore.getState().flashItemId).toBe(null);
   });
 });

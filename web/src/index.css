@@ -1363,7 +1363,7 @@ aside[aria-label="Workspace"][data-maximized] {
 
 .animate-message-highlight {
   --message-highlight: color-mix(in oklch, var(--warning) 16%, transparent);
-  animation: message-highlight 800ms ease-out;
+  animation: message-highlight 1500ms ease-out;
   border-radius: var(--radius-lg);
 }
 

@@ -1535,7 +1535,7 @@ async function uploadFileBlocks(
 }
 
 // Must match the message-highlight animation duration in index.css.
-const FLASH_DURATION_MS = 800;
+const FLASH_DURATION_MS = 1500;
 const WORKSPACE_INVALIDATION_DEBOUNCE_MS = 750;
 
 // Reconnect backoff for the session SSE stream. Databricks Apps' ingress
