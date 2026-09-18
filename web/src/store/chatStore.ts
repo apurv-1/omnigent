@@ -1534,7 +1534,7 @@ async function uploadFileBlocks(
   return blocks;
 }
 
-// Must match the @keyframes user-msg-flash duration in index.css.
+// Must match the message-highlight animation duration in index.css.
 const FLASH_DURATION_MS = 800;
 const WORKSPACE_INVALIDATION_DEBOUNCE_MS = 750;
 

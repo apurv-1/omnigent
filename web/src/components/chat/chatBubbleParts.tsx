@@ -709,7 +709,7 @@ function UserBubble({ bubble }: { bubble: Extract<Bubble, { kind: "user" }> }) {
       data-role="user"
       data-user-message-id={bubble.itemId}
       data-message-id={bubble.itemId}
-      className="max-w-[640px]"
+      className={cn("max-w-[640px]", flashing && "animate-message-highlight")}
     >
       <div className="ml-auto flex w-fit max-w-full flex-col items-end">
         {/* w-fit + ml-auto shrink-wrap the row so the author avatar sits
@@ -736,7 +736,6 @@ function UserBubble({ bubble }: { bubble: Extract<Bubble, { kind: "user" }> }) {
             </Tooltip>
           )}
           <MessageContent
-            className={cn(flashing && "animate-user-msg-flash")}
             // Another contributor's bubble takes their avatar color at low
             // alpha instead of the default bg-muted.
             style={
@@ -985,18 +984,14 @@ function AssistantBubble({
         data-role="assistant"
         data-response-stable-id={bubble.stableId}
         data-message-id={bubble.responseId}
-        className={
-          spansFullColumn ? "max-w-full" : "max-w-3xl min-[2561px]:max-w-[clamp(56rem,30vw,64rem)]"
-        }
+        className={cn(
+          spansFullColumn ? "max-w-full" : "max-w-3xl min-[2561px]:max-w-[clamp(56rem,30vw,64rem)]",
+          flashing && "animate-message-highlight",
+        )}
       >
         {/* A fold-only bubble takes w-full at the ordinary max-w-3xl cap rather
             than shrink-wrapping to the summary row's ~110px. */}
-        <MessageContent
-          className={cn(
-            spansFullColumn || foldOnly ? "w-full" : undefined,
-            flashing && "animate-user-msg-flash",
-          )}
-        >
+        <MessageContent className={spansFullColumn || foldOnly ? "w-full" : undefined}>
           <BlockRenderer
             items={bubble.items}
             sessionStatus={sessionStatus}
